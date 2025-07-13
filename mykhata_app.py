@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import re
 
-st.set_page_config(page_title="MyKhata", layout="centered")
+st.set_page_config(page_title="MyKhata", layout="wide")
 
 # -------------------- Login --------------------
 if "logged_in" not in st.session_state:
@@ -14,12 +15,20 @@ if not st.session_state.logged_in:
     st.title("🔐 MyKhata Login")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
+
+    def validate_username(name):
+        return bool(re.match(r"^[A-Z][a-zA-Z0-9]+$", name))
+
+    def validate_password(pw):
+        return bool(re.match(r"^[A-Z][a-zA-Z0-9@#$%^&+=]{5,}$", pw))
+
     if st.button("Login"):
-        if username and password:
+        if validate_username(username) and validate_password(password):
             st.session_state.logged_in = True
-            st.rerun()  # ✅ Replaced experimental_rerun with rerun
+            st.session_state.username = username
+            st.rerun()
         else:
-            st.warning("Enter both username and password")
+            st.warning("Username must be alphanumeric with first letter capitalized. Password must be alphanumeric with one special character and first letter capitalized.")
     st.stop()
 
 # -------------------- File Path --------------------
@@ -70,45 +79,84 @@ def add_transaction():
 
 # -------------------- Dashboard --------------------
 def show_dashboard():
-    st.title("📊 MyKhata Dashboard")
+    st.title("📊 Dashboard")
     total_income = data[data['Type'] == "Income"]["Amount"].sum()
     total_expense = data[data['Type'] == "Expense"]["Amount"].sum()
     balance = total_income - total_expense
 
-    st.markdown("""
-    <div style='background: linear-gradient(to right, #a1c4fd, #c2e9fb); padding: 20px; border-radius: 10px;'>
-        <h3 style='margin: 0;'>Hello, <b>Sudarshan</b> 👋</h3>
-        <h1 style='margin: 10px 0;'>₹{:.2f}</h1>
-        <div style='display: flex; justify-content: space-between;'>
-            <span style='color: green;'>Income: ₹{:.2f}</span>
-            <span style='color: red;'>Expense: ₹{:.2f}</span>
-        </div>
+    st.markdown(f"""
+    <div style='background: #f5f7fa; border-radius: 12px; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); margin-bottom: 20px;'>
+        <h3>Hello, <b>{st.session_state.username}</b> 👋</h3>
+        <h1>₹{balance:.2f}</h1>
+        <p style='color:green;'>Income: ₹{total_income:.2f} &nbsp;&nbsp;&nbsp; <span style='color:red;'>Expense: ₹{total_expense:.2f}</span></p>
     </div>
-    <br>
-    """.format(balance, total_income, total_expense), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    # Charts
-    data['Month'] = data['Date'].dt.strftime('%b %Y')
-    monthly = data.groupby(['Month', 'Type'])['Amount'].sum().reset_index()
-    fig = px.bar(monthly, x='Month', y='Amount', color='Type', barmode='group', title="Monthly Overview")
+    filter_option = st.selectbox("Filter", ["Monthly", "Daily", "Yearly"])
+
+    if filter_option == "Monthly":
+        data['Period'] = data['Date'].dt.to_period('M').astype(str)
+    elif filter_option == "Daily":
+        data['Period'] = data['Date'].dt.to_period('D').astype(str)
+    else:
+        data['Period'] = data['Date'].dt.to_period('Y').astype(str)
+
+    chart_data = data.groupby(['Period', 'Type'])['Amount'].sum().reset_index()
+    fig = px.bar(chart_data, x='Period', y='Amount', color='Type', barmode='group', title=f"{filter_option} Overview")
     st.plotly_chart(fig, use_container_width=True)
 
-    # Recent Transactions
-    st.subheader("🧾 Recent Transactions")
-    st.dataframe(data.sort_values(by="Date", ascending=False).head(5), use_container_width=True)
+    st.subheader("🧾 All Transactions")
+    st.dataframe(data.sort_values(by="Date", ascending=False), use_container_width=True)
 
 # -------------------- Reports --------------------
 def show_reports():
-    st.subheader("📁 All Transactions")
+    st.subheader("📁 Reports")
     st.dataframe(data.sort_values(by="Date", ascending=False), use_container_width=True)
     st.download_button("⬇️ Download CSV", data.to_csv(index=False), "mykhata_report.csv")
 
+# -------------------- Settings --------------------
+def show_settings():
+    st.subheader("⚙️ Settings")
+    st.info("Share your dashboard or invite others to contribute.")
+    st.text_input("Invite User Email")
+    st.button("Send Invite")
+
 # -------------------- Menu --------------------
 data = load_data()
-menu = st.sidebar.selectbox("📚 Menu", ["Dashboard", "Add Transaction", "Reports"])
-if menu == "Dashboard":
+menu = st.sidebar.radio("📚 Menu", ["Home", "Add", "Reports", "Settings"])
+
+if menu == "Home":
     show_dashboard()
-elif menu == "Add Transaction":
+elif menu == "Add":
     add_transaction()
 elif menu == "Reports":
     show_reports()
+elif menu == "Settings":
+    show_settings()
+
+# -------------------- Bottom Nav --------------------
+st.markdown("""
+<style>
+    .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #fff;
+        padding: 10px;
+        box-shadow: 0 -1px 5px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-around;
+    }
+    .bottom-nav i {
+        font-size: 24px;
+    }
+</style>
+<div class='bottom-nav'>
+    <i>🏠</i>
+    <i>📁</i>
+    <i style='font-size:36px;'>➕</i>
+    <i>📊</i>
+    <i>⚙️</i>
+</div>
+""", unsafe_allow_html=True)
