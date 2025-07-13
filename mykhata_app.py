@@ -113,150 +113,51 @@ def login_page():
         if not user_match.empty:
             st.session_state.logged_in = True
             st.session_state.username = username
-            st.success("✅ Login Successful!")
-            st.experimental_rerun()
+            st.success("✅ Login Successful! Redirecting...")
+            st.session_state.active_page = "Home"
+            st.rerun()
         else:
             st.error("❌ Invalid Username or Password")
 
     if st.button("New Here? Create Account"):
         st.session_state.show_signup = True
-        st.experimental_rerun()
+        st.rerun()
 
-# -------------------- Dashboard --------------------
+# -------------------- Main Pages --------------------
 def show_dashboard():
-    users = load_users()
-    name = users[users['Username'] == st.session_state.username]['Name'].values[0]
-    st.markdown(f"""<h3>👋 Hello, {name}!</h3>""", unsafe_allow_html=True)
-    st.markdown("""<h2 style='text-align:center;'>📊 Dashboard</h2>""", unsafe_allow_html=True)
-    df = load_data()
-    df = df[df['Username'] == st.session_state.username]
+    st.write("📊 Dashboard page (Will include card + graph + filters + transactions)")
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        income = df[df['Type'] == 'Income']['Amount'].sum()
-        st.markdown(f"<div style='background:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 8px gray'><h4>Total Income</h4><h2 style='color:green;'>₹{income:,.2f}</h2></div>", unsafe_allow_html=True)
-    with col2:
-        expense = df[df['Type'] == 'Expense']['Amount'].sum()
-        st.markdown(f"<div style='background:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 8px gray'><h4>Total Expense</h4><h2 style='color:red;'>₹{expense:,.2f}</h2></div>", unsafe_allow_html=True)
-    with col3:
-        balance = income - expense
-        st.markdown(f"<div style='background:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 8px gray'><h4>Net Balance</h4><h2>₹{balance:,.2f}</h2></div>", unsafe_allow_html=True)
-
-    if not df.empty:
-        st.markdown("<br><h4>📈 Trend (Choose Range)</h4>", unsafe_allow_html=True)
-        range_opt = st.selectbox("Select", ["Daily", "Monthly", "Yearly"])
-        if range_opt == "Monthly":
-            df['Period'] = df['Date'].dt.to_period('M').astype(str)
-        elif range_opt == "Yearly":
-            df['Period'] = df['Date'].dt.to_period('Y').astype(str)
-        else:
-            df['Period'] = df['Date'].dt.date.astype(str)
-
-        chart = df.groupby(['Period', 'Type'])['Amount'].sum().reset_index()
-        fig = px.line(chart, x='Period', y='Amount', color='Type', markers=True)
-        fig.update_traces(line=dict(width=2))
-        fig.update_layout(xaxis_title=None)
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("<br><h4>🧾 Recent Transactions</h4>", unsafe_allow_html=True)
-    st.dataframe(df.sort_values("Date", ascending=False).head(10), use_container_width=True)
-
-# -------------------- Add Entry --------------------
 def add_transaction():
-    st.markdown("<h2>➕ Add Transaction</h2>", unsafe_allow_html=True)
-    df = load_data()
-    cat_df = load_categories()
-    user_cats = cat_df[cat_df['Username'] == st.session_state.username]
+    st.write("➕ Add transaction form")
 
-    with st.form("entry_form", clear_on_submit=True):
-        t_type = st.selectbox("Type", ["Income", "Expense", "Loan"])
-        existing = user_cats[user_cats['Type'] == t_type]['Category'].unique().tolist()
-        category = st.selectbox("Category", existing + ["+ Add New"])
-        if category == "+ Add New":
-            category = st.text_input("New Category")
-        amount = st.number_input("Amount", min_value=0.0, step=0.01)
-        note = st.text_input("Note")
-        date = st.date_input("Date", datetime.today())
-
-        submitted = st.form_submit_button("Save Entry")
-        if submitted:
-            new_entry = pd.DataFrame([[st.session_state.username, date, t_type, category, amount, note]], columns=df.columns)
-            df = pd.concat([df, new_entry], ignore_index=True)
-            save_data(df)
-
-            if category not in existing:
-                cat_df = pd.concat([cat_df, pd.DataFrame([[st.session_state.username, t_type, category]], columns=cat_df.columns)], ignore_index=True)
-                save_categories(cat_df)
-
-            st.success("✅ Entry Saved!")
-            st.experimental_rerun()
-
-# -------------------- Profile --------------------
 def profile_page():
-    users = load_users()
-    user_data = users[users['Username'] == st.session_state.username].iloc[0]
-    st.markdown("<h2>👤 Profile</h2>", unsafe_allow_html=True)
-    name = st.text_input("Name", value=user_data['Name'])
-    mobile = st.text_input("Mobile", value=user_data['Mobile'])
-    email = st.text_input("Email", value=user_data['Email'])
-    image = st.file_uploader("Upload Profile Picture", type=["jpg", "png"])
-    if st.button("Save Profile"):
-        users.loc[users['Username'] == st.session_state.username, ['Name', 'Mobile', 'Email']] = [name, mobile, email]
-        if image:
-            filename = f"{st.session_state.username}_profile.png"
-            with open(filename, "wb") as f:
-                f.write(image.getbuffer())
-            users.loc[users['Username'] == st.session_state.username, 'ProfilePic'] = filename
-        save_users(users)
-        st.success("✅ Profile Updated")
+    st.write("👤 Profile & invite page")
 
-    st.markdown("---")
-    st.markdown("### ➕ Invite Another User To Add Transactions")
-    with st.form("invite_user"):
-        new_username = st.text_input("New User Username")
-        new_password = st.text_input("Password", type="password")
-        new_mobile = st.text_input("Mobile")
-        new_email = st.text_input("Email")
-        submitted = st.form_submit_button("Create Sub User")
-        if submitted:
-            if new_username in users['Username'].values:
-                st.warning("❌ Username already exists")
-            else:
-                new_user = pd.DataFrame([[new_username, new_password, "", new_mobile, new_email, "", st.session_state.username]], columns=users.columns)
-                users = pd.concat([users, new_user], ignore_index=True)
-                save_users(users)
-                st.success("✅ Sub-user added. They can now log in to your account.")
+def report_page():
+    st.write("📈 Reports by category/date")
 
-# -------------------- Main App --------------------
+def wallet_page():
+    st.write("💼 Wallet overview")
+
+# -------------------- App Framework --------------------
 def main_app():
-    with st.sidebar:
-        st.markdown("""
-        <div style="display:flex;justify-content:center;margin-bottom:10px">
-            <div style="border-radius:50%;padding:8px;width:40px;height:40px;background:#f0f0f0;text-align:center;">
-                <b>≡</b>
-            </div>
-        </div>""", unsafe_allow_html=True)
-        menu = st.radio("Menu", ["Home", "Wallet", "Add", "Report", "Profile", "Logout"])
+    # Top bar or sidebar nav with hide logic
+    menu = st.sidebar.radio("Menu", ["Home", "Add", "Wallet", "Report", "Profile", "Logout"])
+    st.session_state.active_page = menu
 
-    if menu == "Home":
-        show_dashboard()
-    elif menu == "Add":
-        add_transaction()
-    elif menu == "Wallet":
-        show_dashboard()
-    elif menu == "Report":
-        show_dashboard()
-    elif menu == "Profile":
-        profile_page()
+    if menu == "Home": show_dashboard()
+    elif menu == "Add": add_transaction()
+    elif menu == "Wallet": wallet_page()
+    elif menu == "Report": report_page()
+    elif menu == "Profile": profile_page()
     elif menu == "Logout":
         st.session_state.logged_in = False
         st.session_state.username = ""
-        st.success("🔒 Logged out!")
         st.experimental_rerun()
 
-    # Bottom Floating Nav
+    # Floating Nav Bar
     st.markdown("""
-        <style>
+    <style>
         .floating-bar {
             position: fixed;
             bottom: 0;
@@ -267,10 +168,11 @@ def main_app():
             justify-content: space-around;
             padding: 10px;
             box-shadow: 0 -2px 8px gray;
+            z-index: 999;
         }
         .floating-bar div {
             text-align: center;
-            font-size: 20px;
+            font-size: 22px;
         }
         .plus-button {
             background: #2196F3;
@@ -283,14 +185,14 @@ def main_app():
             line-height: 60px;
             margin-top: -30px;
         }
-        </style>
-        <div class='floating-bar'>
-            <div>🏠</div>
-            <div>📊</div>
-            <div class='plus-button'>+</div>
-            <div>📁</div>
-            <div>⚙️</div>
-        </div>
+    </style>
+    <div class='floating-bar'>
+        <div onclick='window.location.reload()'>🏠</div>
+        <div onclick='window.location.reload()'>📊</div>
+        <div class='plus-button' onclick='window.location.reload()'>+</div>
+        <div onclick='window.location.reload()'>📁</div>
+        <div onclick='window.location.reload()'>⚙️</div>
+    </div>
     """, unsafe_allow_html=True)
 
 # -------------------- Launch --------------------
