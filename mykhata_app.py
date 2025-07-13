@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 import re
 
-st.set_page_config(page_title="MyKhata", layout="wide")
+st.set_page_config(page_title="MyKhata Modern", layout="wide")
 
 # -------------------- Session Init --------------------
 if "logged_in" not in st.session_state:
@@ -20,13 +20,14 @@ if "active_page" not in st.session_state:
 # -------------------- File Paths --------------------
 data_file = "mykhata_data.csv"
 users_file = "users_public_details.csv"
+categories_file = "category_memory.csv"
 
-# -------------------- Data Load/Save --------------------
+# -------------------- Load/Save --------------------
 def load_data():
     if os.path.exists(data_file):
         return pd.read_csv(data_file, parse_dates=['Date'])
     else:
-        df = pd.DataFrame(columns=['Date', 'Type', 'Category', 'Amount', 'Note'])
+        df = pd.DataFrame(columns=['Username', 'Date', 'Type', 'Category', 'Amount', 'Note'])
         df.to_csv(data_file, index=False)
         return df
 
@@ -44,11 +45,23 @@ def load_users():
 def save_users(df):
     df.to_csv(users_file, index=False)
 
+def load_categories():
+    if os.path.exists(categories_file):
+        return pd.read_csv(categories_file)
+    else:
+        df = pd.DataFrame(columns=['Username', 'Type', 'Category'])
+        df.to_csv(categories_file, index=False)
+        return df
+
+def save_categories(df):
+    df.to_csv(categories_file, index=False)
+
 # -------------------- Signup --------------------
 def signup_page():
     st.markdown("""
         <div style='text-align:center;'>
-            <h2>🚀 Create New MyKhata Account</h2>
+            <h2>🚀 Welcome to MyKhata</h2>
+            <p>Create a new account below</p>
         </div>
     """, unsafe_allow_html=True)
     name = st.text_input("Your Full Name")
@@ -101,47 +114,62 @@ def login_page():
         st.session_state.show_signup = True
         st.experimental_rerun()
 
-# -------------------- Home Dashboard --------------------
+# -------------------- Dashboard --------------------
 def show_dashboard():
-    st.markdown("<h2 style='text-align:center;'>📊 Dashboard</h2>", unsafe_allow_html=True)
-    data = load_data()
+    st.markdown("""<h2 style='text-align:center;'>📊 My Dashboard</h2>""", unsafe_allow_html=True)
+    df = load_data()
+    df = df[df['Username'] == st.session_state.username]
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 10px rgba(0,0,0,0.2);'><h4>Total Income</h4><h2 style='color:green;'>₹{:,.2f}</h2></div>".format(data[data['Type']=='Income']['Amount'].sum()), unsafe_allow_html=True)
+        income = df[df['Type'] == 'Income']['Amount'].sum()
+        st.markdown(f"<div style='background:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 8px gray'><h4>Total Income</h4><h2 style='color:green;'>₹{income:,.2f}</h2></div>", unsafe_allow_html=True)
     with col2:
-        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 10px rgba(0,0,0,0.2);'><h4>Total Expense</h4><h2 style='color:red;'>₹{:,.2f}</h2></div>".format(data[data['Type']=='Expense']['Amount'].sum()), unsafe_allow_html=True)
+        expense = df[df['Type'] == 'Expense']['Amount'].sum()
+        st.markdown(f"<div style='background:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 8px gray'><h4>Total Expense</h4><h2 style='color:red;'>₹{expense:,.2f}</h2></div>", unsafe_allow_html=True)
     with col3:
-        balance = data[data['Type']=='Income']['Amount'].sum() - data[data['Type']=='Expense']['Amount'].sum()
-        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 10px rgba(0,0,0,0.2);'><h4>Net Balance</h4><h2>₹{:,.2f}</h2></div>".format(balance), unsafe_allow_html=True)
+        balance = income - expense
+        st.markdown(f"<div style='background:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 8px gray'><h4>Net Balance</h4><h2>₹{balance:,.2f}</h2></div>", unsafe_allow_html=True)
 
-    if not data.empty:
-        st.markdown("<br><h4>📈 Income vs Expense (Monthly)</h4>", unsafe_allow_html=True)
-        data['Month'] = data['Date'].dt.to_period('M').astype(str)
-        chart = data.groupby(['Month', 'Type'])['Amount'].sum().reset_index()
+    if not df.empty:
+        st.markdown("<br><h4>📈 Income vs Expense Trend</h4>", unsafe_allow_html=True)
+        df['Month'] = df['Date'].dt.to_period('M').astype(str)
+        chart = df.groupby(['Month', 'Type'])['Amount'].sum().reset_index()
         fig = px.line(chart, x='Month', y='Amount', color='Type', markers=True)
         fig.update_traces(line=dict(width=2))
         st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("<br><h4>📃 Recent Transactions</h4>", unsafe_allow_html=True)
-    st.dataframe(data.sort_values("Date", ascending=False).head(10), use_container_width=True)
+    st.markdown("<br><h4>🧾 Recent Transactions</h4>", unsafe_allow_html=True)
+    st.dataframe(df.sort_values("Date", ascending=False).head(10), use_container_width=True)
 
 # -------------------- Add Entry --------------------
 def add_transaction():
-    st.markdown("<h2>➕ Add Transaction</h2>", unsafe_allow_html=True)
-    data = load_data()
+    st.markdown("<h2>➕ Add Entry</h2>", unsafe_allow_html=True)
+    df = load_data()
+    cat_df = load_categories()
+    user_cats = cat_df[cat_df['Username'] == st.session_state.username]
+
     with st.form("entry_form"):
-        t_type = st.selectbox("Type", ["Income", "Expense"])
-        category = st.text_input("Category")
+        t_type = st.selectbox("Type", ["Income", "Expense", "Loan"])
+        existing = user_cats[user_cats['Type'] == t_type]['Category'].unique().tolist()
+        category = st.selectbox("Category", existing + ["+ Add New"])
+        if category == "+ Add New":
+            category = st.text_input("New Category")
         amount = st.number_input("Amount", min_value=0.0, step=0.01)
         note = st.text_input("Note")
         date = st.date_input("Date", datetime.today())
+
         submitted = st.form_submit_button("Save Entry")
         if submitted:
-            new_row = pd.DataFrame([[date, t_type, category, amount, note]], columns=data.columns)
-            data = pd.concat([data, new_row], ignore_index=True)
-            save_data(data)
-            st.success("✅ Transaction Saved")
+            new_entry = pd.DataFrame([[st.session_state.username, date, t_type, category, amount, note]], columns=df.columns)
+            df = pd.concat([df, new_entry], ignore_index=True)
+            save_data(df)
+
+            if category not in existing:
+                cat_df = pd.concat([cat_df, pd.DataFrame([[st.session_state.username, t_type, category]], columns=cat_df.columns)], ignore_index=True)
+                save_categories(cat_df)
+
+            st.success("✅ Entry Saved!")
             st.experimental_rerun()
 
 # -------------------- Profile --------------------
@@ -149,33 +177,32 @@ def profile_page():
     users = load_users()
     user_data = users[users['Username'] == st.session_state.username].iloc[0]
     st.markdown("<h2>👤 Profile</h2>", unsafe_allow_html=True)
-    st.text_input("Full Name", value=user_data['Name'], disabled=True)
-    st.text_input("Username", value=user_data['Username'], disabled=True)
-    st.text_input("Mobile", value=user_data['Mobile'], disabled=True)
-    st.text_input("Email", value=user_data['Email'], disabled=True)
+    st.text_input("Name", value=user_data['Name'])
+    st.text_input("Mobile", value=user_data['Mobile'])
+    st.text_input("Email", value=user_data['Email'])
 
 # -------------------- Main App --------------------
 def main_app():
     with st.sidebar:
         st.markdown("""
-            <div style="display:flex;justify-content:center;">
-                <div style="border:1px solid #ccc;border-radius:50%;padding:8px;width:40px;height:40px;background-color:#f0f0f0;text-align:center;">
-                    ☰
-                </div>
+        <div style="display:flex;justify-content:center;margin-bottom:10px">
+            <div style="border-radius:50%;padding:8px;width:40px;height:40px;background:#f0f0f0;text-align:center;">
+                <b>≡</b>
             </div>
-        """, unsafe_allow_html=True)
-        menu = ["Home", "Add", "Reports", "Profile", "Logout"]
-        selected = st.radio("", menu)
+        </div>""", unsafe_allow_html=True)
+        menu = st.radio("Menu", ["Home", "Wallet", "Add", "Report", "Profile", "Logout"])
 
-    if selected == "Home":
+    if menu == "Home":
         show_dashboard()
-    elif selected == "Add":
+    elif menu == "Add":
         add_transaction()
-    elif selected == "Reports":
-        st.markdown("<h2>📑 Reports Coming Soon</h2>", unsafe_allow_html=True)
-    elif selected == "Profile":
+    elif menu == "Wallet":
+        show_dashboard()
+    elif menu == "Report":
+        show_dashboard()
+    elif menu == "Profile":
         profile_page()
-    elif selected == "Logout":
+    elif menu == "Logout":
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.success("🔒 Logged out!")
