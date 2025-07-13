@@ -15,7 +15,7 @@ if "username" not in st.session_state:
 
 # -------------------- File Path --------------------
 data_file = "mykhata_data.csv"
-users_file = "users.csv"
+users_file = "users_public_details.csv"
 
 # -------------------- Load or Create Data --------------------
 def load_data():
@@ -34,7 +34,7 @@ def load_users():
     if os.path.exists(users_file):
         return pd.read_csv(users_file)
     else:
-        df = pd.DataFrame(columns=['Mobile', 'Username', 'Password'])
+        df = pd.DataFrame(columns=['Mobile', 'Username', 'Password', 'Name', 'Email'])
         df.to_csv(users_file, index=False)
         return df
 
@@ -45,20 +45,29 @@ def save_users(df):
 def signup_page():
     st.title("📱 Register via Mobile OTP")
     mobile = st.text_input("Mobile Number")
-    otp_sent = st.button("Send OTP")
-    if otp_sent and mobile:
+    if st.button("Send OTP"):
         st.success("OTP sent successfully to " + mobile)
         otp = st.text_input("Enter OTP")
-        if otp == "123456":  # Simulated OTP
+        if otp == "123456":
             st.success("Mobile Verified!")
-            username = st.text_input("Create Username")
-            password = st.text_input("Create Password")
+            name = st.text_input("Full Name")
+            email = st.text_input("Email")
+            username = st.text_input("Create Username (Start with uppercase & alphanumeric)")
+            password = st.text_input("Create Password (Uppercase start, alphanumeric & special char)")
+
             if st.button("Create Account"):
+                if not re.match(r"^[A-Z][A-Za-z0-9]+$", username):
+                    st.error("Invalid username format.")
+                    return
+                if not re.match(r"^[A-Z][A-Za-z0-9@#$%^&+=!]+$", password):
+                    st.error("Invalid password format.")
+                    return
+
                 users = load_users()
                 if mobile in users['Mobile'].values:
                     st.error("Account already exists with this mobile number.")
                 else:
-                    new_user = pd.DataFrame([[mobile, username, password]], columns=['Mobile', 'Username', 'Password'])
+                    new_user = pd.DataFrame([[mobile, username, password, name, email]], columns=['Mobile', 'Username', 'Password', 'Name', 'Email'])
                     users = pd.concat([users, new_user], ignore_index=True)
                     save_users(users)
                     st.success("Account Created! You can now log in.")
@@ -162,7 +171,7 @@ def show_settings():
         if invite_mobile in users['Mobile'].values:
             st.error("Mobile number already registered.")
         else:
-            users = pd.concat([users, pd.DataFrame([[invite_mobile, new_user, new_pass]], columns=['Mobile', 'Username', 'Password'])], ignore_index=True)
+            users = pd.concat([users, pd.DataFrame([[invite_mobile, new_user, new_pass, '', '']], columns=['Mobile', 'Username', 'Password', 'Name', 'Email'])], ignore_index=True)
             save_users(users)
             st.success("User Invited Successfully")
 
