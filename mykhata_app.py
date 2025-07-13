@@ -14,6 +14,8 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 if "show_signup" not in st.session_state:
     st.session_state.show_signup = False
+if "account_created" not in st.session_state:
+    st.session_state.account_created = False
 if "active_page" not in st.session_state:
     st.session_state.active_page = "Home"
 
@@ -38,7 +40,7 @@ def load_users():
     if os.path.exists(users_file):
         return pd.read_csv(users_file)
     else:
-        df = pd.DataFrame(columns=['Username', 'Password', 'Name', 'Mobile', 'Email'])
+        df = pd.DataFrame(columns=['Username', 'Password', 'Name', 'Mobile', 'Email', 'ProfilePic', 'MainAccount'])
         df.to_csv(users_file, index=False)
         return df
 
@@ -82,20 +84,26 @@ def signup_page():
         if username in users['Username'].values:
             st.error("⚠️ Username already exists")
         else:
-            new_user = pd.DataFrame([[username, password, name, mobile, email]], columns=['Username', 'Password', 'Name', 'Mobile', 'Email'])
+            new_user = pd.DataFrame([[username, password, name, mobile, email, "", ""]], columns=['Username', 'Password', 'Name', 'Mobile', 'Email', 'ProfilePic', 'MainAccount'])
             users = pd.concat([users, new_user], ignore_index=True)
             save_users(users)
-            st.success("✅ Account Created Successfully")
+            st.success("✅ Account Created Successfully! Please login below.")
             st.session_state.show_signup = False
-            st.experimental_rerun()
+            st.session_state.account_created = True
 
 # -------------------- Login Page --------------------
 def login_page():
     st.markdown("""
         <div style='text-align:center;'>
             <h2>🔐 Login to MyKhata</h2>
+            <p>🎉 Welcome to MyKhata – Manage your money smartly.</p>
         </div>
     """, unsafe_allow_html=True)
+
+    if st.session_state.get("account_created"):
+        st.success("✅ Account created. Please login.")
+        st.session_state.account_created = False
+
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
@@ -116,6 +124,9 @@ def login_page():
 
 # -------------------- Dashboard --------------------
 def show_dashboard():
+    users = load_users()
+    name = users[users['Username'] == st.session_state.username]['Name'].values[0]
+    st.markdown(f"""<h3>👋 Hello, {name}!</h3>""", unsafe_allow_html=True)
     st.markdown("""<h2 style='text-align:center;'>📊 Dashboard</h2>""", unsafe_allow_html=True)
     df = load_data()
     df = df[df['Username'] == st.session_state.username]
@@ -188,21 +199,37 @@ def profile_page():
     name = st.text_input("Name", value=user_data['Name'])
     mobile = st.text_input("Mobile", value=user_data['Mobile'])
     email = st.text_input("Email", value=user_data['Email'])
+    image = st.file_uploader("Upload Profile Picture", type=["jpg", "png"])
     if st.button("Save Profile"):
         users.loc[users['Username'] == st.session_state.username, ['Name', 'Mobile', 'Email']] = [name, mobile, email]
+        if image:
+            filename = f"{st.session_state.username}_profile.png"
+            with open(filename, "wb") as f:
+                f.write(image.getbuffer())
+            users.loc[users['Username'] == st.session_state.username, 'ProfilePic'] = filename
         save_users(users)
         st.success("✅ Profile Updated")
+
+    st.markdown("---")
+    st.markdown("### ➕ Invite Another User To Add Transactions")
+    with st.form("invite_user"):
+        new_username = st.text_input("New User Username")
+        new_password = st.text_input("Password", type="password")
+        new_mobile = st.text_input("Mobile")
+        new_email = st.text_input("Email")
+        submitted = st.form_submit_button("Create Sub User")
+        if submitted:
+            if new_username in users['Username'].values:
+                st.warning("❌ Username already exists")
+            else:
+                new_user = pd.DataFrame([[new_username, new_password, "", new_mobile, new_email, "", st.session_state.username]], columns=users.columns)
+                users = pd.concat([users, new_user], ignore_index=True)
+                save_users(users)
+                st.success("✅ Sub-user added. They can now log in to your account.")
 
 # -------------------- Main App --------------------
 def main_app():
     with st.sidebar:
-        st.markdown("""
-        <style>
-        .css-1oe5cao, .stRadio > div {
-            flex-direction: column !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
         st.markdown("""
         <div style="display:flex;justify-content:center;margin-bottom:10px">
             <div style="border-radius:50%;padding:8px;width:40px;height:40px;background:#f0f0f0;text-align:center;">
