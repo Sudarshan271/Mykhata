@@ -37,7 +37,7 @@ def load_users():
     if os.path.exists(users_file):
         return pd.read_csv(users_file)
     else:
-        df = pd.DataFrame(columns=['Username', 'Password', 'Name'])
+        df = pd.DataFrame(columns=['Username', 'Password', 'Name', 'Mobile', 'Email'])
         df.to_csv(users_file, index=False)
         return df
 
@@ -54,6 +54,8 @@ def signup_page():
     name = st.text_input("Your Full Name")
     username = st.text_input("Create Username (Start with uppercase & alphanumeric)")
     password = st.text_input("Create Password (Start with uppercase, alphanumeric, special char)", type="password")
+    mobile = st.text_input("Mobile Number")
+    email = st.text_input("Email")
 
     if st.button("Create Account"):
         if not re.match(r"^[A-Z][A-Za-z0-9]+$", username):
@@ -67,7 +69,7 @@ def signup_page():
         if username in users['Username'].values:
             st.error("⚠️ Username already exists")
         else:
-            new_user = pd.DataFrame([[username, password, name]], columns=['Username', 'Password', 'Name'])
+            new_user = pd.DataFrame([[username, password, name, mobile, email]], columns=['Username', 'Password', 'Name', 'Mobile', 'Email'])
             users = pd.concat([users, new_user], ignore_index=True)
             save_users(users)
             st.success("✅ Account Created Successfully")
@@ -142,6 +144,16 @@ def add_transaction():
             st.success("✅ Transaction Saved")
             st.experimental_rerun()
 
+# -------------------- Profile --------------------
+def profile_page():
+    users = load_users()
+    user_data = users[users['Username'] == st.session_state.username].iloc[0]
+    st.markdown("<h2>👤 Profile</h2>", unsafe_allow_html=True)
+    st.text_input("Full Name", value=user_data['Name'], disabled=True)
+    st.text_input("Username", value=user_data['Username'], disabled=True)
+    st.text_input("Mobile", value=user_data['Mobile'], disabled=True)
+    st.text_input("Email", value=user_data['Email'], disabled=True)
+
 # -------------------- Main App --------------------
 def main_app():
     with st.sidebar:
@@ -152,7 +164,7 @@ def main_app():
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        menu = ["Home", "Add", "Reports", "Logout"]
+        menu = ["Home", "Add", "Reports", "Profile", "Logout"]
         selected = st.radio("", menu)
 
     if selected == "Home":
@@ -161,6 +173,8 @@ def main_app():
         add_transaction()
     elif selected == "Reports":
         st.markdown("<h2>📑 Reports Coming Soon</h2>", unsafe_allow_html=True)
+    elif selected == "Profile":
+        profile_page()
     elif selected == "Logout":
         st.session_state.logged_in = False
         st.session_state.username = ""
