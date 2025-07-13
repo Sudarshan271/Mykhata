@@ -1,3 +1,20 @@
+# Install necessary libraries if running in an environment like Google Colab
+# If you are running this locally and have these installed, you can comment these lines out.
+import subprocess
+import sys
+
+def install_packages():
+    required_packages = ['streamlit', 'pandas', 'altair']
+    for package in required_packages:
+        try:
+            __import__(package)
+        except ImportError:
+            print(f"Installing {package}...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+            print(f"{package} installed successfully.")
+
+install_packages()
+
 import streamlit as st
 import pandas as pd
 import os
@@ -869,3 +886,4 @@ if not st.session_state.logged_in:
         login_page()
 else:
     main_app()
+
