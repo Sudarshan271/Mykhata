@@ -17,11 +17,11 @@ if "show_signup" not in st.session_state:
 if "active_page" not in st.session_state:
     st.session_state.active_page = "Home"
 
-# -------------------- File Path --------------------
+# -------------------- File Paths --------------------
 data_file = "mykhata_data.csv"
 users_file = "users_public_details.csv"
 
-# -------------------- Load or Create Data --------------------
+# -------------------- Data Load/Save --------------------
 def load_data():
     if os.path.exists(data_file):
         return pd.read_csv(data_file, parse_dates=['Date'])
@@ -33,7 +33,6 @@ def load_data():
 def save_data(df):
     df.to_csv(data_file, index=False)
 
-# -------------------- Load Users --------------------
 def load_users():
     if os.path.exists(users_file):
         return pd.read_csv(users_file)
@@ -45,40 +44,35 @@ def load_users():
 def save_users(df):
     df.to_csv(users_file, index=False)
 
-# -------------------- Sign Up --------------------
+# -------------------- Signup --------------------
 def signup_page():
-    st.title("👋 Welcome to MyKhata")
-    st.subheader("Create a New Account")
-
-    name = st.text_input("Full Name")
+    st.markdown("<h2 style='text-align:center;'>🚀 Create New MyKhata Account</h2>", unsafe_allow_html=True)
+    name = st.text_input("Your Full Name")
     username = st.text_input("Create Username (Start with uppercase & alphanumeric)")
-    password = st.text_input("Create Password (Uppercase start, alphanumeric & special char)")
+    password = st.text_input("Create Password (Start with uppercase, alphanumeric, special char)", type="password")
 
     if st.button("Create Account"):
         if not re.match(r"^[A-Z][A-Za-z0-9]+$", username):
-            st.error("Invalid username format. Must start with uppercase and be alphanumeric.")
+            st.error("❌ Invalid Username Format")
             return
         if not re.match(r"^[A-Z][A-Za-z0-9@#$%^&+=!]+$", password):
-            st.error("Invalid password format. Must start with uppercase and include a special character.")
+            st.error("❌ Invalid Password Format")
             return
 
         users = load_users()
         if username in users['Username'].values:
-            st.error("Username already exists. Please choose another one.")
+            st.error("⚠️ Username already exists")
         else:
             new_user = pd.DataFrame([[username, password, name]], columns=['Username', 'Password', 'Name'])
             users = pd.concat([users, new_user], ignore_index=True)
             save_users(users)
-            st.success("🎉 Account Created! You can now log in.")
+            st.success("✅ Account Created Successfully")
             st.session_state.show_signup = False
             st.experimental_rerun()
-    st.stop()
 
-# -------------------- Login Page --------------------
+# -------------------- Login --------------------
 def login_page():
-    st.title("👋 Welcome to MyKhata")
-    st.subheader("Login to Your Account")
-
+    st.markdown("<h2 style='text-align:center;'>🔐 Login to MyKhata</h2>", unsafe_allow_html=True)
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
@@ -88,69 +82,78 @@ def login_page():
         if not user_match.empty:
             st.session_state.logged_in = True
             st.session_state.username = username
-            st.success("Login successful!")
+            st.success("✅ Login Successful!")
             st.experimental_rerun()
         else:
-            st.error("Incorrect Username or Password")
+            st.error("❌ Invalid Username or Password")
 
-    if st.button("New User? Create an Account"):
+    if st.button("New Here? Create Account"):
         st.session_state.show_signup = True
         st.experimental_rerun()
-    st.stop()
 
-# -------------------- Main App Pages --------------------
+# -------------------- Home Dashboard --------------------
+def show_dashboard():
+    st.markdown("<h2 style='text-align:center;'>📊 Dashboard</h2>", unsafe_allow_html=True)
+    data = load_data()
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:10px;box-shadow:0px 4px 8px rgba(0,0,0,0.1);'><h4>Total Income</h4><h2 style='color:green;'>₹{:,.2f}</h2></div>".format(data[data['Type']=='Income']['Amount'].sum()), unsafe_allow_html=True)
+    with col2:
+        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:10px;box-shadow:0px 4px 8px rgba(0,0,0,0.1);'><h4>Total Expense</h4><h2 style='color:red;'>₹{:,.2f}</h2></div>".format(data[data['Type']=='Expense']['Amount'].sum()), unsafe_allow_html=True)
+    with col3:
+        balance = data[data['Type']=='Income']['Amount'].sum() - data[data['Type']=='Expense']['Amount'].sum()
+        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:10px;box-shadow:0px 4px 8px rgba(0,0,0,0.1);'><h4>Net Balance</h4><h2>₹{:,.2f}</h2></div>".format(balance), unsafe_allow_html=True)
+
+    if not data.empty:
+        st.markdown("<br><h4>📈 Income vs Expense (Monthly)</h4>", unsafe_allow_html=True)
+        data['Month'] = data['Date'].dt.to_period('M').astype(str)
+        chart = data.groupby(['Month', 'Type'])['Amount'].sum().reset_index()
+        fig = px.line(chart, x='Month', y='Amount', color='Type', markers=True)
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("<br><h4>📃 Recent Transactions</h4>", unsafe_allow_html=True)
+    st.dataframe(data.sort_values("Date", ascending=False).head(10), use_container_width=True)
+
+# -------------------- Add Entry --------------------
+def add_transaction():
+    st.markdown("<h2>➕ Add Transaction</h2>", unsafe_allow_html=True)
+    data = load_data()
+    with st.form("entry_form"):
+        t_type = st.selectbox("Type", ["Income", "Expense"])
+        category = st.text_input("Category")
+        amount = st.number_input("Amount", min_value=0.0, step=0.01)
+        note = st.text_input("Note")
+        date = st.date_input("Date", datetime.today())
+        submitted = st.form_submit_button("Save Entry")
+        if submitted:
+            new_row = pd.DataFrame([[date, t_type, category, amount, note]], columns=data.columns)
+            data = pd.concat([data, new_row], ignore_index=True)
+            save_data(data)
+            st.success("✅ Transaction Saved")
+            st.experimental_rerun()
+
+# -------------------- Main App --------------------
 def main_app():
-    st.sidebar.title("MyKhata Menu")
-    choice = st.sidebar.radio("Go to", ["Home", "Reports", "Balance", "Settings", "Logout"])
-    st.session_state.active_page = choice
-
-    if choice == "Home":
-        st.title("📊 Dashboard")
-        data = load_data()
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Income", f"₹{data[data['Type']=='Income']['Amount'].sum():,.2f}")
-        with col2:
-            st.metric("Total Expenses", f"₹{data[data['Type']=='Expense']['Amount'].sum():,.2f}")
-        with col3:
-            balance = data[data['Type']=='Income']['Amount'].sum() - data[data['Type']=='Expense']['Amount'].sum()
-            st.metric("Net Balance", f"₹{balance:,.2f}")
-
-        st.subheader("Monthly Overview")
-        if not data.empty:
-            data['Month'] = data['Date'].dt.to_period('M').astype(str)
-            chart = data.groupby(['Month', 'Type'])['Amount'].sum().reset_index()
-            fig = px.line(chart, x='Month', y='Amount', color='Type', markers=True, title="Income vs Expense Over Time")
-            st.plotly_chart(fig, use_container_width=True)
-
-        st.subheader("Recent Transactions")
-        st.dataframe(data.sort_values("Date", ascending=False).head(10), use_container_width=True)
-
-    elif choice == "Reports":
-        st.title("📈 Reports")
-        st.info("Detailed reports will be available here.")
-
-    elif choice == "Balance":
-        st.title("💰 Balance Sheet")
-        st.info("Detailed balance sheet coming soon.")
-
-    elif choice == "Settings":
-        st.title("⚙️ Settings")
-        st.info("User settings and profile options will be here.")
-
-    elif choice == "Logout":
+    menu = ["Home", "Add", "Reports", "Logout"]
+    selected = st.sidebar.radio("Menu", menu)
+    if selected == "Home":
+        show_dashboard()
+    elif selected == "Add":
+        add_transaction()
+    elif selected == "Reports":
+        st.markdown("<h2>📑 Reports Coming Soon</h2>", unsafe_allow_html=True)
+    elif selected == "Logout":
         st.session_state.logged_in = False
         st.session_state.username = ""
-        st.success("Logged out successfully!")
+        st.success("🔒 Logged out!")
         st.experimental_rerun()
 
-# -------------------- Auth Check --------------------
+# -------------------- App Launch --------------------
 if not st.session_state.logged_in:
     if st.session_state.show_signup:
         signup_page()
     else:
         login_page()
-    st.stop()
-
-# -------------------- Run Main App --------------------
-main_app()
+else:
+    main_app()
