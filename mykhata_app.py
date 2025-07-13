@@ -46,7 +46,11 @@ def save_users(df):
 
 # -------------------- Signup --------------------
 def signup_page():
-    st.markdown("<h2 style='text-align:center;'>🚀 Create New MyKhata Account</h2>", unsafe_allow_html=True)
+    st.markdown("""
+        <div style='text-align:center;'>
+            <h2>🚀 Create New MyKhata Account</h2>
+        </div>
+    """, unsafe_allow_html=True)
     name = st.text_input("Your Full Name")
     username = st.text_input("Create Username (Start with uppercase & alphanumeric)")
     password = st.text_input("Create Password (Start with uppercase, alphanumeric, special char)", type="password")
@@ -72,7 +76,11 @@ def signup_page():
 
 # -------------------- Login --------------------
 def login_page():
-    st.markdown("<h2 style='text-align:center;'>🔐 Login to MyKhata</h2>", unsafe_allow_html=True)
+    st.markdown("""
+        <div style='text-align:center;'>
+            <h2>🔐 Login to MyKhata</h2>
+        </div>
+    """, unsafe_allow_html=True)
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
@@ -98,18 +106,19 @@ def show_dashboard():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:10px;box-shadow:0px 4px 8px rgba(0,0,0,0.1);'><h4>Total Income</h4><h2 style='color:green;'>₹{:,.2f}</h2></div>".format(data[data['Type']=='Income']['Amount'].sum()), unsafe_allow_html=True)
+        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 10px rgba(0,0,0,0.2);'><h4>Total Income</h4><h2 style='color:green;'>₹{:,.2f}</h2></div>".format(data[data['Type']=='Income']['Amount'].sum()), unsafe_allow_html=True)
     with col2:
-        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:10px;box-shadow:0px 4px 8px rgba(0,0,0,0.1);'><h4>Total Expense</h4><h2 style='color:red;'>₹{:,.2f}</h2></div>".format(data[data['Type']=='Expense']['Amount'].sum()), unsafe_allow_html=True)
+        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 10px rgba(0,0,0,0.2);'><h4>Total Expense</h4><h2 style='color:red;'>₹{:,.2f}</h2></div>".format(data[data['Type']=='Expense']['Amount'].sum()), unsafe_allow_html=True)
     with col3:
         balance = data[data['Type']=='Income']['Amount'].sum() - data[data['Type']=='Expense']['Amount'].sum()
-        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:10px;box-shadow:0px 4px 8px rgba(0,0,0,0.1);'><h4>Net Balance</h4><h2>₹{:,.2f}</h2></div>".format(balance), unsafe_allow_html=True)
+        st.markdown("<div style='background-color:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 10px rgba(0,0,0,0.2);'><h4>Net Balance</h4><h2>₹{:,.2f}</h2></div>".format(balance), unsafe_allow_html=True)
 
     if not data.empty:
         st.markdown("<br><h4>📈 Income vs Expense (Monthly)</h4>", unsafe_allow_html=True)
         data['Month'] = data['Date'].dt.to_period('M').astype(str)
         chart = data.groupby(['Month', 'Type'])['Amount'].sum().reset_index()
         fig = px.line(chart, x='Month', y='Amount', color='Type', markers=True)
+        fig.update_traces(line=dict(width=2))
         st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("<br><h4>📃 Recent Transactions</h4>", unsafe_allow_html=True)
@@ -135,8 +144,17 @@ def add_transaction():
 
 # -------------------- Main App --------------------
 def main_app():
-    menu = ["Home", "Add", "Reports", "Logout"]
-    selected = st.sidebar.radio("Menu", menu)
+    with st.sidebar:
+        st.markdown("""
+            <div style="display:flex;justify-content:center;">
+                <div style="border:1px solid #ccc;border-radius:50%;padding:8px;width:40px;height:40px;background-color:#f0f0f0;text-align:center;">
+                    ☰
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        menu = ["Home", "Add", "Reports", "Logout"]
+        selected = st.radio("", menu)
+
     if selected == "Home":
         show_dashboard()
     elif selected == "Add":
