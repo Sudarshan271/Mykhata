@@ -22,7 +22,7 @@ data_file = "mykhata_data.csv"
 users_file = "users_public_details.csv"
 categories_file = "category_memory.csv"
 
-# -------------------- Load/Save --------------------
+# -------------------- Load/Save Functions --------------------
 def load_data():
     if os.path.exists(data_file):
         return pd.read_csv(data_file, parse_dates=['Date'])
@@ -56,7 +56,7 @@ def load_categories():
 def save_categories(df):
     df.to_csv(categories_file, index=False)
 
-# -------------------- Signup --------------------
+# -------------------- Signup Page --------------------
 def signup_page():
     st.markdown("""
         <div style='text-align:center;'>
@@ -89,7 +89,7 @@ def signup_page():
             st.session_state.show_signup = False
             st.experimental_rerun()
 
-# -------------------- Login --------------------
+# -------------------- Login Page --------------------
 def login_page():
     st.markdown("""
         <div style='text-align:center;'>
@@ -116,7 +116,7 @@ def login_page():
 
 # -------------------- Dashboard --------------------
 def show_dashboard():
-    st.markdown("""<h2 style='text-align:center;'>📊 My Dashboard</h2>""", unsafe_allow_html=True)
+    st.markdown("""<h2 style='text-align:center;'>📊 Dashboard</h2>""", unsafe_allow_html=True)
     df = load_data()
     df = df[df['Username'] == st.session_state.username]
 
@@ -132,11 +132,19 @@ def show_dashboard():
         st.markdown(f"<div style='background:#e3f2fd;padding:20px;border-radius:15px;box-shadow:2px 4px 8px gray'><h4>Net Balance</h4><h2>₹{balance:,.2f}</h2></div>", unsafe_allow_html=True)
 
     if not df.empty:
-        st.markdown("<br><h4>📈 Income vs Expense Trend</h4>", unsafe_allow_html=True)
-        df['Month'] = df['Date'].dt.to_period('M').astype(str)
-        chart = df.groupby(['Month', 'Type'])['Amount'].sum().reset_index()
-        fig = px.line(chart, x='Month', y='Amount', color='Type', markers=True)
+        st.markdown("<br><h4>📈 Trend (Choose Range)</h4>", unsafe_allow_html=True)
+        range_opt = st.selectbox("Select", ["Daily", "Monthly", "Yearly"])
+        if range_opt == "Monthly":
+            df['Period'] = df['Date'].dt.to_period('M').astype(str)
+        elif range_opt == "Yearly":
+            df['Period'] = df['Date'].dt.to_period('Y').astype(str)
+        else:
+            df['Period'] = df['Date'].dt.date.astype(str)
+
+        chart = df.groupby(['Period', 'Type'])['Amount'].sum().reset_index()
+        fig = px.line(chart, x='Period', y='Amount', color='Type', markers=True)
         fig.update_traces(line=dict(width=2))
+        fig.update_layout(xaxis_title=None)
         st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("<br><h4>🧾 Recent Transactions</h4>", unsafe_allow_html=True)
@@ -144,12 +152,12 @@ def show_dashboard():
 
 # -------------------- Add Entry --------------------
 def add_transaction():
-    st.markdown("<h2>➕ Add Entry</h2>", unsafe_allow_html=True)
+    st.markdown("<h2>➕ Add Transaction</h2>", unsafe_allow_html=True)
     df = load_data()
     cat_df = load_categories()
     user_cats = cat_df[cat_df['Username'] == st.session_state.username]
 
-    with st.form("entry_form"):
+    with st.form("entry_form", clear_on_submit=True):
         t_type = st.selectbox("Type", ["Income", "Expense", "Loan"])
         existing = user_cats[user_cats['Type'] == t_type]['Category'].unique().tolist()
         category = st.selectbox("Category", existing + ["+ Add New"])
@@ -177,13 +185,24 @@ def profile_page():
     users = load_users()
     user_data = users[users['Username'] == st.session_state.username].iloc[0]
     st.markdown("<h2>👤 Profile</h2>", unsafe_allow_html=True)
-    st.text_input("Name", value=user_data['Name'])
-    st.text_input("Mobile", value=user_data['Mobile'])
-    st.text_input("Email", value=user_data['Email'])
+    name = st.text_input("Name", value=user_data['Name'])
+    mobile = st.text_input("Mobile", value=user_data['Mobile'])
+    email = st.text_input("Email", value=user_data['Email'])
+    if st.button("Save Profile"):
+        users.loc[users['Username'] == st.session_state.username, ['Name', 'Mobile', 'Email']] = [name, mobile, email]
+        save_users(users)
+        st.success("✅ Profile Updated")
 
 # -------------------- Main App --------------------
 def main_app():
     with st.sidebar:
+        st.markdown("""
+        <style>
+        .css-1oe5cao, .stRadio > div {
+            flex-direction: column !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         st.markdown("""
         <div style="display:flex;justify-content:center;margin-bottom:10px">
             <div style="border-radius:50%;padding:8px;width:40px;height:40px;background:#f0f0f0;text-align:center;">
@@ -208,7 +227,46 @@ def main_app():
         st.success("🔒 Logged out!")
         st.experimental_rerun()
 
-# -------------------- App Launch --------------------
+    # Bottom Floating Nav
+    st.markdown("""
+        <style>
+        .floating-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #e3f2fd;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px;
+            box-shadow: 0 -2px 8px gray;
+        }
+        .floating-bar div {
+            text-align: center;
+            font-size: 20px;
+        }
+        .plus-button {
+            background: #2196F3;
+            color: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 30px;
+            text-align: center;
+            line-height: 60px;
+            margin-top: -30px;
+        }
+        </style>
+        <div class='floating-bar'>
+            <div>🏠</div>
+            <div>📊</div>
+            <div class='plus-button'>+</div>
+            <div>📁</div>
+            <div>⚙️</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+# -------------------- Launch --------------------
 if not st.session_state.logged_in:
     if st.session_state.show_signup:
         signup_page()
