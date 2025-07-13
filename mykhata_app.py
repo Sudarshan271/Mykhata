@@ -34,37 +34,56 @@ def load_users():
     if os.path.exists(users_file):
         return pd.read_csv(users_file)
     else:
-        df = pd.DataFrame(columns=['Username', 'Password'])
+        df = pd.DataFrame(columns=['Mobile', 'Username', 'Password'])
         df.to_csv(users_file, index=False)
         return df
 
 def save_users(df):
     df.to_csv(users_file, index=False)
 
+# -------------------- Sign Up --------------------
+def signup_page():
+    st.title("📱 Register via Mobile OTP")
+    mobile = st.text_input("Mobile Number")
+    otp_sent = st.button("Send OTP")
+    if otp_sent and mobile:
+        st.success("OTP sent successfully to " + mobile)
+        otp = st.text_input("Enter OTP")
+        if otp == "123456":  # Simulated OTP
+            st.success("Mobile Verified!")
+            username = st.text_input("Create Username")
+            password = st.text_input("Create Password")
+            if st.button("Create Account"):
+                users = load_users()
+                if mobile in users['Mobile'].values:
+                    st.error("Account already exists with this mobile number.")
+                else:
+                    new_user = pd.DataFrame([[mobile, username, password]], columns=['Mobile', 'Username', 'Password'])
+                    users = pd.concat([users, new_user], ignore_index=True)
+                    save_users(users)
+                    st.success("Account Created! You can now log in.")
+                    st.stop()
+    st.stop()
+
 # -------------------- Login Page --------------------
 def login_page():
     st.title("🔐 MyKhata Login")
-    username = st.text_input("Username")
+    mobile = st.text_input("Mobile Number")
     password = st.text_input("Password", type="password")
-
-    def validate_username(name):
-        return bool(re.match(r"^[A-Z][a-zA-Z0-9]+$", name))
-
-    def validate_password(pw):
-        return bool(re.match(r"^[A-Z][a-zA-Z0-9@#$%^&+=]{5,}$", pw))
 
     if st.button("Login"):
         users = load_users()
-        if validate_username(username) and validate_password(password):
-            match = users[(users['Username'] == username) & (users['Password'] == password)]
-            if not match.empty:
-                st.session_state.logged_in = True
-                st.session_state.username = username
-                st.experimental_rerun()
-            else:
-                st.error("Incorrect Username or Password")
+        user_match = users[(users['Mobile'] == mobile) & (users['Password'] == password)]
+        if not user_match.empty:
+            st.session_state.logged_in = True
+            st.session_state.username = user_match.iloc[0]['Username']
+            st.success("Login successful!")
+            st.experimental_rerun()
         else:
-            st.warning("Username must be alphanumeric with first letter capitalized. Password must include one special character and start with a capital letter.")
+            st.error("Incorrect Mobile Number or Password")
+
+    if st.button("Create New Account"):
+        signup_page()
     st.stop()
 
 # -------------------- Add Transaction --------------------
@@ -135,14 +154,17 @@ def show_settings():
     st.file_uploader("Upload Profile Picture")
     st.markdown("---")
     st.subheader("👥 Invite User")
-    st.text_input("Invite via Email or Mobile")
-    st.text_input("Create Username")
-    st.text_input("Create Password")
+    invite_mobile = st.text_input("Invite via Mobile")
+    new_user = st.text_input("Create Username")
+    new_pass = st.text_input("Create Password")
     if st.button("Send Invite"):
         users = load_users()
-        users = pd.concat([users, pd.DataFrame([[username, password]], columns=['Username', 'Password'])], ignore_index=True)
-        save_users(users)
-        st.success("User Invited Successfully")
+        if invite_mobile in users['Mobile'].values:
+            st.error("Mobile number already registered.")
+        else:
+            users = pd.concat([users, pd.DataFrame([[invite_mobile, new_user, new_pass]], columns=['Mobile', 'Username', 'Password'])], ignore_index=True)
+            save_users(users)
+            st.success("User Invited Successfully")
 
 # -------------------- Logout --------------------
 def logout():
@@ -193,7 +215,7 @@ st.markdown("""
 }
 .bottom-nav i {
     font-size: 22px;
-    color: grey;
+    color: #333;
 }
 .plus-icon {
     font-size: 36px;
